@@ -226,7 +226,7 @@ EXPECTED_MODELS = [
 ]
 
 
-@testing.run_if_exists("reference-pipeline-extended.zip")
+@testing.run_if_exists("prototype_mtc_extended_reference_pipeline.zip")
 def test_mtc_extended_progressive():
 
     import activitysim.abm  # register components # noqa: F401
@@ -247,6 +247,14 @@ def test_mtc_extended_progressive():
         data_model_dir=_example_path("data_model"),
         output_dir=out_dir,
     )
+
+    # These settings are required so that the test matches the reference pipeline
+    state.settings.households_sample_size = 10
+    state.settings.use_shadow_pricing = False
+    state.settings.want_dest_choice_sample_tables = False
+    state.settings.want_dest_choice_presampling = True
+    state.settings.recode_pipeline_columns = False
+
     state.filesystem.persist_sharrow_cache()
     state.logging.config_logger()
     state.settings.trace_hh_id = 1196298
@@ -259,7 +267,7 @@ def test_mtc_extended_progressive():
         state.run.by_name(step_name)
         try:
             state.checkpoint.check_against(
-                Path(__file__).parent.joinpath("reference-pipeline-extended.zip"),
+                Path(__file__).parent.joinpath("prototype_mtc_extended_reference_pipeline.zip"),
                 checkpoint_name=step_name,
             )
         except Exception:
@@ -269,7 +277,7 @@ def test_mtc_extended_progressive():
             print(f"> prototype_mtc_extended {step_name}: ok")
 
 
-@testing.run_if_exists("reference-pipeline-extended.zip")
+@testing.run_if_exists("prototype_mtc_extended_reference_pipeline.zip")
 def test_mtc_extended_progressive_chunkless():
 
     import activitysim.abm  # register components # noqa: F401
@@ -301,11 +309,10 @@ def test_mtc_extended_progressive_chunkless():
     for step_name in EXPECTED_MODELS:
         state.run.by_name(step_name)
         try:
-            pass
-            # state.checkpoint.check_against(
-            #     Path(__file__).parent.joinpath("reference-pipeline-extended.zip"),
-            #     checkpoint_name=step_name,
-            # )
+            state.checkpoint.check_against(
+                Path(__file__).parent.joinpath("prototype_mtc_extended_reference_pipeline.zip"),
+                checkpoint_name=step_name,
+            )
         except Exception:
             print(f"> prototype_mtc_extended {step_name}: ERROR")
             raise
