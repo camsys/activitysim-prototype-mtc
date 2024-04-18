@@ -24,7 +24,6 @@ def _test_path(dirname):
 def run_test_mtc(
     multiprocess=False, chunkless=False, recode=False, sharrow=False, extended=False
 ):
-
     def regress(ext):
         if ext:
             regress_trips_df = pd.read_csv(_test_path("regress/final_trips-ext.csv"))
@@ -180,9 +179,9 @@ def test_mtc_sharrow_ext():
 
 
 EXPECTED_MODELS = [
-    'input_checker',
-    'initialize_proto_population',
-    'compute_disaggregate_accessibility',
+    "input_checker",
+    "initialize_proto_population",
+    "compute_disaggregate_accessibility",
     "initialize_landuse",
     "initialize_households",
     "compute_accessibility",
@@ -224,7 +223,6 @@ EXPECTED_MODELS = [
 
 @testing.run_if_exists("reference-pipeline-extended.zip")
 def test_mtc_extended_progressive():
-
     import activitysim.abm  # register components # noqa: F401
 
     out_dir = _test_path("output-progressive")
@@ -232,21 +230,39 @@ def test_mtc_extended_progressive():
     Path(out_dir).joinpath(".gitignore").write_text("**\n")
 
     working_dir = Path(_example_path("."))
-    data_dir = _example_path("data")
-    data_model_dir = _example_path("data_model")
+
+    settings = {
+        "treat_warnings_as_errors": False,
+        "households_sample_size": 10,
+        "chunk_size": 0,
+        "use_shadow_pricing": False,
+        "want_dest_choice_sample_tables": False,
+        "cleanup_pipeline_after_run": True,
+        "output_tables": {
+            "h5_store": False,
+            "action": "include",
+            "prefix": "final_",
+            "sort": True,
+            "tables": [
+                {
+                    "tablename": "trips",
+                    "decode_columns": {
+                        "origin": "land_use.zone_id",
+                        "destination": "land_use.zone_id",
+                    },
+                },
+            ],
+        },
+        "recode_pipeline_columns": True,
+    }
 
     state = workflow.State.make_default(
         working_dir=working_dir,
-        configs_dir=(
-            _test_path("configs_recode"),
-            _test_path("ext-configs"),
-            _example_path("ext-configs"),
-            _test_path("configs"),
-            _example_path("configs"),
-        ),
-        data_dir=data_dir,
-        data_model_dir=data_model_dir,
+        configs_dir=("ext-configs", "configs"),
+        data_dir="data",
+        data_model_dir="data_model",
         output_dir=out_dir,
+        settings=settings,
     )
     state.filesystem.persist_sharrow_cache()
 
