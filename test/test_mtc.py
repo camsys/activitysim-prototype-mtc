@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 import pandas.testing as pdt
+import pytest
 
 from activitysim.core import testing, workflow
 
@@ -24,7 +25,6 @@ def _test_path(dirname):
 def run_test_mtc(
     multiprocess=False, chunkless=False, recode=False, sharrow=False, extended=False
 ):
-
     def regress(ext, out_dir):
         if ext:
             regress_trips_df = pd.read_csv(_test_path("regress/final_trips-ext.csv"))
@@ -226,20 +226,36 @@ EXPECTED_MODELS = [
 ]
 
 
-@testing.run_if_exists("reference-pipeline-extended.zip")
-def test_mtc_extended_progressive():
+@pytest.mark.parametrize(
+    "chunk_training_mode,recode_pipeline_columns",
+    [
+        ("disabled", True),
+        ("explicit", False),
+    ],
+)
+def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns):
     import activitysim.abm  # register components # noqa: F401
 
-    out_dir = _test_path("output-progressive")
+    out_dir = _test_path(f"output-progressive-recode{recode_pipeline_columns}")
     Path(out_dir).mkdir(exist_ok=True)
     Path(out_dir).joinpath(".gitignore").write_text("**\n")
 
     working_dir = Path(_example_path("."))
 
+    output_trips_table = {
+                    "tablename": "trips"
+                }
+    if recode_pipeline_columns:
+        output_trips_table["decode_columns"] = {
+            "origin": "land_use.zone_id",
+            "destination": "land_use.zone_id",
+        }
+
     settings = {
         "treat_warnings_as_errors": False,
         "households_sample_size": 10,
         "chunk_size": 0,
+        "chunk_training_mode": chunk_training_mode,
         "use_shadow_pricing": False,
         "want_dest_choice_sample_tables": False,
         "cleanup_pipeline_after_run": True,
@@ -249,16 +265,10 @@ def test_mtc_extended_progressive():
             "prefix": "final_",
             "sort": True,
             "tables": [
-                {
-                    "tablename": "trips",
-                    "decode_columns": {
-                        "origin": "land_use.zone_id",
-                        "destination": "land_use.zone_id",
-                    },
-                },
+                output_trips_table,
             ],
         },
-        "recode_pipeline_columns": True,
+        "recode_pipeline_columns": recode_pipeline_columns,
     }
 
     state = workflow.State.make_default(
@@ -277,62 +287,30 @@ def test_mtc_extended_progressive():
     assert state.settings.chunk_size == 0
     assert not state.settings.sharrow
 
-    for step_name in EXPECTED_MODELS:
-        state.run.by_name(step_name)
-        try:
-            state.checkpoint.check_against(
-                Path(__file__).parent.joinpath("reference-pipeline-extended.zip"),
-                checkpoint_name=step_name,
-            )
-        except Exception:
-            print(f"> prototype_mtc_extended {step_name}: ERROR")
-            raise
-        else:
-            print(f"> prototype_mtc_extended {step_name}: ok")
-
-
-@testing.run_if_exists("reference-pipeline-extended.zip")
-def test_mtc_extended_progressive_chunkless():
-
-    import activitysim.abm  # register components # noqa: F401
-
-    out_dir = _test_path("output-progressive-2")
-    Path(out_dir).mkdir(exist_ok=True)
-    Path(out_dir).joinpath(".gitignore").write_text("**\n")
-
-    state = workflow.State.make_default(
-        configs_dir=(
-            _test_path("configs_chunkless"),
-            _test_path("ext-configs"),
-            _example_path("ext-configs"),
-            _test_path("configs"),
-            _example_path("configs"),
-        ),
-        data_dir=_example_path("data"),
-        data_model_dir=_example_path("data_model"),
-        output_dir=out_dir,
-    )
-    state.filesystem.persist_sharrow_cache()
-    state.logging.config_logger()
-    state.settings.trace_hh_id = 1196298
-
-    assert state.settings.models == EXPECTED_MODELS
-    assert state.settings.chunk_size == 0
-    assert not state.settings.sharrow
+    ref_pipeline = Path(__file__).parent.joinpath(f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip")
+    if not ref_pipeline.exists():
+        state.settings.cleanup_pipeline_after_run = False
 
     for step_name in EXPECTED_MODELS:
         state.run.by_name(step_name)
-        try:
-            pass
-            # state.checkpoint.check_against(
-            #     Path(__file__).parent.joinpath("reference-pipeline-extended.zip"),
-            #     checkpoint_name=step_name,
-            # )
-        except Exception:
-            print(f"> prototype_mtc_extended {step_name}: ERROR")
-            raise
+        if ref_pipeline.exists():
+            try:
+                state.checkpoint.check_against(
+                    Path(__file__).parent.joinpath(f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"),
+                    checkpoint_name=step_name,
+                )
+            except Exception:
+                print(f"> prototype_mtc_extended {step_name}: ERROR")
+                raise
+            else:
+                print(f"> prototype_mtc_extended {step_name}: ok")
         else:
-            print(f"> prototype_mtc_extended {step_name}: ok")
+            print(f"> prototype_mtc_extended {step_name}: ran, not checked")
+
+    if not ref_pipeline.exists():
+        # make new reference pipeline file if it is missing
+        import shutil
+        shutil.make_archive(ref_pipeline.with_suffix(""), 'zip', state.checkpoint.store.filename)
 
 
 if __name__ == "__main__":
