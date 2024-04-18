@@ -9,7 +9,7 @@ import pandas as pd
 import pandas.testing as pdt
 import pytest
 
-from activitysim.core import testing, workflow
+from activitysim.core import workflow
 
 
 def _example_path(dirname):
@@ -242,9 +242,7 @@ def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns):
 
     working_dir = Path(_example_path("."))
 
-    output_trips_table = {
-                    "tablename": "trips"
-                }
+    output_trips_table = {"tablename": "trips"}
     if recode_pipeline_columns:
         output_trips_table["decode_columns"] = {
             "origin": "land_use.zone_id",
@@ -287,7 +285,9 @@ def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns):
     assert state.settings.chunk_size == 0
     assert not state.settings.sharrow
 
-    ref_pipeline = Path(__file__).parent.joinpath(f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip")
+    ref_pipeline = Path(__file__).parent.joinpath(
+        f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"
+    )
     if not ref_pipeline.exists():
         state.settings.cleanup_pipeline_after_run = False
 
@@ -296,7 +296,9 @@ def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns):
         if ref_pipeline.exists():
             try:
                 state.checkpoint.check_against(
-                    Path(__file__).parent.joinpath(f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"),
+                    Path(__file__).parent.joinpath(
+                        f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"
+                    ),
                     checkpoint_name=step_name,
                 )
             except Exception:
@@ -310,7 +312,10 @@ def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns):
     if not ref_pipeline.exists():
         # make new reference pipeline file if it is missing
         import shutil
-        shutil.make_archive(ref_pipeline.with_suffix(""), 'zip', state.checkpoint.store.filename)
+
+        shutil.make_archive(
+            ref_pipeline.with_suffix(""), "zip", state.checkpoint.store.filename
+        )
 
 
 if __name__ == "__main__":
