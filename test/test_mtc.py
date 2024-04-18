@@ -231,7 +231,12 @@ def test_mtc_extended_progressive():
     Path(out_dir).mkdir(exist_ok=True)
     Path(out_dir).joinpath(".gitignore").write_text("**\n")
 
+    working_dir = Path(_example_path("."))
+    data_dir = _example_path("data")
+    data_model_dir = _example_path("data_model")
+
     state = workflow.State.make_default(
+        working_dir=working_dir,
         configs_dir=(
             _test_path("configs_recode"),
             _test_path("ext-configs"),
@@ -239,8 +244,8 @@ def test_mtc_extended_progressive():
             _test_path("configs"),
             _example_path("configs"),
         ),
-        data_dir=_example_path("data"),
-        data_model_dir=_example_path("data_model"),
+        data_dir=data_dir,
+        data_model_dir=data_model_dir,
         output_dir=out_dir,
     )
     state.filesystem.persist_sharrow_cache()
