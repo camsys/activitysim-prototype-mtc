@@ -234,7 +234,9 @@ EXPECTED_MODELS = [
         ("explicit", True, True),
     ],
 )
-def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns, sharrow_enabled):
+def test_mtc_extended_progressive(
+    chunk_training_mode, recode_pipeline_columns, sharrow_enabled
+):
     import activitysim.abm  # register components # noqa: F401
 
     out_dir = _test_path(f"output-progressive-recode{recode_pipeline_columns}")
@@ -333,4 +335,3 @@ if __name__ == "__main__":
     test_mtc_extended_progressive("disabled", True, False)
     test_mtc_extended_progressive("explicit", False, False)
     test_mtc_extended_progressive("explicit", True, True)
-
