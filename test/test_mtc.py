@@ -229,8 +229,8 @@ EXPECTED_MODELS = [
 @pytest.mark.parametrize(
     "chunk_training_mode,recode_pipeline_columns,sharrow_enabled",
     [
-        ("disabled", True),
-        ("explicit", False),
+        ("disabled", True, False),
+        ("explicit", False, False),
         ("explicit", True, True),
     ],
 )
@@ -275,8 +275,8 @@ def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns, 
         raise ValueError("sharrow_enabled requires recode_pipeline_columns")
 
     if sharrow_enabled:
-        settings["sharrow"] = "test"
-        del settings["trace_hh_id"]
+        settings["sharrow"] = "test"  # check sharrow in `test` mode
+        del settings["trace_hh_id"]  # do not test sharrow with tracing
 
     state = workflow.State.make_default(
         working_dir=working_dir,
@@ -298,6 +298,8 @@ def test_mtc_extended_progressive(chunk_training_mode, recode_pipeline_columns, 
         f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"
     )
     if not ref_pipeline.exists():
+        # if reference pipeline does not exist, don't clean up so we can save
+        # and create it at the end of running this test.
         state.settings.cleanup_pipeline_after_run = False
 
     for step_name in EXPECTED_MODELS:
