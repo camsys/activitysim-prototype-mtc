@@ -20,3 +20,6 @@ SIMULATE_CHOOSER_COLUMNS:
   - num_escort_tours
   - num_non_escort_tours
   - adult
+
+compute_settings:
+  use_numexpr: True

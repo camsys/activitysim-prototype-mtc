@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 import pandas.testing as pdt
+import pytest
 
-from activitysim.core import testing, workflow
+from activitysim.core import workflow
 
 
 def _example_path(dirname):
@@ -24,13 +25,12 @@ def _test_path(dirname):
 def run_test_mtc(
     multiprocess=False, chunkless=False, recode=False, sharrow=False, extended=False
 ):
-
-    def regress(ext):
+    def regress(ext, out_dir):
         if ext:
             regress_trips_df = pd.read_csv(_test_path("regress/final_trips-ext.csv"))
         else:
             regress_trips_df = pd.read_csv(_test_path("regress/final_trips.csv"))
-        final_trips_df = pd.read_csv(_test_path("output/final_trips.csv"))
+        final_trips_df = pd.read_csv(_test_path(out_dir.joinpath("final_trips.csv")))
 
         # column order may not match, so fix it before checking
         assert sorted(regress_trips_df.columns) == sorted(final_trips_df.columns)
@@ -65,12 +65,20 @@ def run_test_mtc(
                 ]
             )
     elif chunkless:
-        run_args.extend(
-            [
-                "-c",
-                _test_path("configs_chunkless"),
-            ]
-        )
+        if extended:
+            run_args.extend(
+                [
+                    "-c",
+                    _test_path("ext-configs_chunkless"),
+                ]
+            )
+        else:
+            run_args.extend(
+                [
+                    "-c",
+                    _test_path("configs_chunkless"),
+                ]
+            )
     elif recode:
         run_args.extend(
             [
@@ -136,53 +144,13 @@ def run_test_mtc(
     else:
         subprocess.run([sys.executable, file_path] + run_args, check=True)
 
-    regress(extended)
-
-
-def test_mtc():
-    run_test_mtc(multiprocess=False)
-
-
-def test_mtc_chunkless():
-    run_test_mtc(multiprocess=False, chunkless=True)
-
-
-def test_mtc_mp():
-    run_test_mtc(multiprocess=True)
-
-
-def test_mtc_recode():
-    run_test_mtc(recode=True)
-
-
-def test_mtc_sharrow():
-    run_test_mtc(sharrow=True)
-
-
-def test_mtc_ext():
-    run_test_mtc(multiprocess=False, extended=True)
-
-
-def test_mtc_chunkless_ext():
-    run_test_mtc(multiprocess=False, chunkless=True, extended=True)
-
-
-def test_mtc_mp_ext():
-    run_test_mtc(multiprocess=True, extended=True)
-
-
-def test_mtc_recode_ext():
-    run_test_mtc(recode=True, extended=True)
-
-
-def test_mtc_sharrow_ext():
-    run_test_mtc(sharrow=True, extended=True)
+    regress(extended, Path(out_dir))
 
 
 EXPECTED_MODELS = [
-    'input_checker',
-    'initialize_proto_population',
-    'compute_disaggregate_accessibility',
+    "input_checker",
+    "initialize_proto_population",
+    "compute_disaggregate_accessibility",
     "initialize_landuse",
     "initialize_households",
     "compute_accessibility",
@@ -222,56 +190,112 @@ EXPECTED_MODELS = [
 ]
 
 
-@testing.run_if_exists("reference-pipeline-extended.zip")
-def test_mtc_extended_progressive():
-
+@pytest.mark.parametrize(
+    "chunk_training_mode,recode_pipeline_columns,sharrow_enabled",
+    [
+        ("disabled", True, False),
+        ("explicit", False, False),
+        ("explicit", True, True),
+    ],
+)
+def test_mtc_extended_progressive(
+    chunk_training_mode, recode_pipeline_columns, sharrow_enabled
+):
     import activitysim.abm  # register components # noqa: F401
 
-    out_dir = _test_path("output-progressive")
+    out_dir = _test_path(f"output-progressive-recode{recode_pipeline_columns}")
     Path(out_dir).mkdir(exist_ok=True)
     Path(out_dir).joinpath(".gitignore").write_text("**\n")
 
+    working_dir = Path(_example_path("."))
+
+    output_trips_table = {"tablename": "trips"}
+    if recode_pipeline_columns:
+        output_trips_table["decode_columns"] = {
+            "origin": "land_use.zone_id",
+            "destination": "land_use.zone_id",
+        }
+
+    settings = {
+        "treat_warnings_as_errors": False,
+        "households_sample_size": 10,
+        "chunk_size": 0,
+        "chunk_training_mode": chunk_training_mode,
+        "use_shadow_pricing": False,
+        "want_dest_choice_sample_tables": False,
+        "cleanup_pipeline_after_run": True,
+        "output_tables": {
+            "h5_store": False,
+            "action": "include",
+            "prefix": "final_",
+            "sort": True,
+            "tables": [
+                output_trips_table,
+            ],
+        },
+        "recode_pipeline_columns": recode_pipeline_columns,
+        "trace_hh_id": 1196298,
+    }
+
+    if sharrow_enabled and not recode_pipeline_columns:
+        raise ValueError("sharrow_enabled requires recode_pipeline_columns")
+
+    if sharrow_enabled:
+        settings["sharrow"] = "test"  # check sharrow in `test` mode
+        del settings["trace_hh_id"]  # do not test sharrow with tracing
+
     state = workflow.State.make_default(
-        configs_dir=(
-            _test_path("configs_recode"),
-            _test_path("ext-configs"),
-            _example_path("ext-configs"),
-            _test_path("configs"),
-            _example_path("configs"),
-        ),
-        data_dir=_example_path("data"),
-        data_model_dir=_example_path("data_model"),
+        working_dir=working_dir,
+        configs_dir=("ext-configs", "configs"),
+        data_dir="data",
+        data_model_dir="data_model",
         output_dir=out_dir,
+        settings=settings,
     )
     state.filesystem.persist_sharrow_cache()
+    state.logging.config_logger()
 
     assert state.settings.models == EXPECTED_MODELS
     assert state.settings.chunk_size == 0
-    assert not state.settings.sharrow
+    if not sharrow_enabled:
+        assert not state.settings.sharrow
+
+    ref_pipeline = Path(__file__).parent.joinpath(
+        f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"
+    )
+    if not ref_pipeline.exists():
+        # if reference pipeline does not exist, don't clean up so we can save
+        # and create it at the end of running this test.
+        state.settings.cleanup_pipeline_after_run = False
 
     for step_name in EXPECTED_MODELS:
         state.run.by_name(step_name)
-        try:
-            state.checkpoint.check_against(
-                Path(__file__).parent.joinpath("reference-pipeline-extended.zip"),
-                checkpoint_name=step_name,
-            )
-        except Exception:
-            print(f"> prototype_mtc_extended {step_name}: ERROR")
-            raise
+        if ref_pipeline.exists():
+            try:
+                state.checkpoint.check_against(
+                    Path(__file__).parent.joinpath(
+                        f"reference-pipeline-extended-recode{recode_pipeline_columns}.zip"
+                    ),
+                    checkpoint_name=step_name,
+                )
+            except Exception:
+                print(f"> prototype_mtc_extended {step_name}: ERROR")
+                raise
+            else:
+                print(f"> prototype_mtc_extended {step_name}: ok")
         else:
-            print(f"> prototype_mtc_extended {step_name}: ok")
+            print(f"> prototype_mtc_extended {step_name}: ran, not checked")
+
+    if not ref_pipeline.exists():
+        # make new reference pipeline file if it is missing
+        import shutil
+
+        shutil.make_archive(
+            ref_pipeline.with_suffix(""), "zip", state.checkpoint.store.filename
+        )
 
 
 if __name__ == "__main__":
-    run_test_mtc(multiprocess=False)
-    run_test_mtc(multiprocess=True)
-    run_test_mtc(multiprocess=False, chunkless=True)
-    run_test_mtc(recode=True)
-    run_test_mtc(sharrow=True)
-    run_test_mtc(multiprocess=False, extended=True)
-    run_test_mtc(multiprocess=True, extended=True)
-    run_test_mtc(multiprocess=False, chunkless=True, extended=True)
-    run_test_mtc(recode=True, extended=True)
-    run_test_mtc(sharrow=True, extended=True)
-    test_mtc_extended_progressive()
+    test_mtc_extended_progressive("disabled", True, False)
+    test_mtc_extended_progressive("explicit", False, False)
+    test_mtc_extended_progressive("explicit", True, True)

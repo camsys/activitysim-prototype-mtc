@@ -2,7 +2,7 @@
 
 SPEC: vehicle_type_choice_op4.csv
 COEFFICIENTS: vehicle_type_choice_op4_coefficients.csv
-ALTS: vehicle_type_choice_op4_alternatives.csv
+# ALTS: vehicle_type_choice_op4_alternatives.csv
 
 explicit_chunk: 25000
 
@@ -107,7 +107,7 @@ COLS_TO_INCLUDE_IN_CHOOSER_TABLE:
   - num_hh_EV
   - home_is_rural
 
-COLS_TO_INCLUDE_IN_ALTERNATIVES_TABLE:
+COLS_TO_INCLUDE_IN_ALTS_TABLE:
   - age
   - fuel_type_num_coded
   - body_type_num_coded
@@ -115,6 +115,10 @@ COLS_TO_INCLUDE_IN_ALTERNATIVES_TABLE:
   - MPG
   - NumMakes
   - NumModels
+  - logged_models
+  - logged_makes
+  - logged_chargers_per_capita
+  - NewPrice
 
 # annotate_persons:
 #   SPEC: annotate_persons_vehicle_type
