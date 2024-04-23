@@ -147,42 +147,6 @@ def run_test_mtc(
     regress(extended, Path(out_dir))
 
 
-# def test_mtc():
-#     run_test_mtc(multiprocess=False)
-#
-#
-# def test_mtc_chunkless():
-#     run_test_mtc(multiprocess=False, chunkless=True)
-#
-#
-# def test_mtc_mp():
-#     run_test_mtc(multiprocess=True)
-#
-#
-# def test_mtc_recode():
-#     run_test_mtc(recode=True)
-#
-#
-# def test_mtc_sharrow():
-#     run_test_mtc(sharrow=True)
-#
-#
-# def test_mtc_ext():
-#     run_test_mtc(multiprocess=False, extended=True)
-#
-#
-# def test_mtc_chunkless_ext():
-#     run_test_mtc(multiprocess=False, chunkless=True, extended=True)
-#
-#
-# def test_mtc_mp_ext():
-#     run_test_mtc(multiprocess=True, extended=True)
-#
-#
-# def test_mtc_sharrow_ext():
-#     run_test_mtc(sharrow=True, extended=True)
-
-
 EXPECTED_MODELS = [
     "input_checker",
     "initialize_proto_population",
